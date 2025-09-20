@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบติดตามงาน</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #f4f7f6;
+        }
+        .view-container {
+            display: none;
+        }
+        .view-container.active {
+            display: block;
+        }
+        .class-button {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .class-button:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .failing-student-row {
+            background-color: #fee2e2 !important; /* bg-red-100 */
+        }
+        .failing-student-row:hover {
+            background-color: #fecaca !important; /* bg-red-200 */
+        }
+        .status-A { background-color: #a7f3d0; color: #065f46; } /* Green */
+        .status-B { background-color: #bfdbfe; color: #1e40af; } /* Blue */
+        .status-C { background-color: #fef08a; color: #854d0e; } /* Yellow */
+        .status-D { background-color: #e9d5ff; color: #581c87; } /* Purple */
+        .status-none { background-color: #fecaca; color: #991b1b; } /* Red */
+        .status-progress { background-color: #e5e7eb; color: #1f2937; } /* Gray for numeric scores */
+
+        #studentDetailTable thead th, #studentSummaryTable thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f9fafb; /* bg-gray-50 */
+        }
+        .table-container {
+             max-height: calc(100vh - 300px); /* Reverted to original height */
+             overflow: auto; /* Changed from overflow-y to auto to allow horizontal scrolling on small screens */
+        }
+        #assignmentTooltip {
+            position: fixed;
+            pointer-events: none;
+        }
+         .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-content {
+            transition: transform 0.25s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Main Container -->
+    <div class="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <header class="mb-6 bg-white p-4 rounded-xl shadow-sm">
+            <div class="flex justify-between items-center">
+                 <div>
+                    <h1 id="mainTitle" class="text-2xl sm:text-3xl font-bold text-gray-800">ระบบติดตามงาน</h1>
+                    <p id="subTitle" class="text-gray-500"></p>
+                </div>
+                <div>
+                    <button id="backButton" class="hidden bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg transition-colors">
+                        <i class="fas fa-chevron-left mr-2"></i> กลับ
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- View for Class Selection -->
+        <div id="class-selection-view" class="view-container active">
+            <div id="class-buttons-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <!-- Class buttons will be rendered here -->
+            </div>
+        </div>
+
+        <!-- View for Student Summary in a Class -->
+        <div id="student-summary-view" class="view-container">
+            <div class="mb-4">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                    <input type="text" id="studentSearchInput" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="ค้นหาชื่อนักเรียน...">
+                </div>
+            </div>
+            <div class="table-container bg-white rounded-xl shadow-sm">
+                <table id="studentSummaryTable" class="w-full text-sm text-left text-gray-600">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-center">ลำดับที่</th>
+                            <th class="px-6 py-3">ชื่อ - สกุล</th>
+                            <th class="px-6 py-3 text-center">คะแนนรวม</th>
+                            <th class="px-6 py-3 text-center">ผลการเรียน</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentSummaryBody">
+                        <!-- Student summary rows will be rendered here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- View for a single Student's Details -->
+        <div id="student-detail-view" class="view-container">
+             <div class="table-container bg-white rounded-xl shadow-sm">
+                <table id="studentDetailTable" class="w-full text-sm text-left text-gray-600">
+                     <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                        <!-- Header is dynamically controlled in JS now -->
+                    </thead>
+                    <tbody id="studentDetailBody">
+                        <!-- Student's assignment details will be rendered here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tooltip Element -->
+    <div id="assignmentTooltip" class="hidden bg-gray-800 text-white text-sm rounded-lg px-3 py-1.5 shadow-lg z-50"></div>
+
+<script type="module" src="script.min.js"></script>
+
+</body>
+</html>
