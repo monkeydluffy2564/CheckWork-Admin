@@ -71,6 +71,9 @@
                     <p id="subTitle" class="text-gray-500"></p>
                 </div>
                 <div>
+                    <button id="settingsButton" class="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100">
+                        <i class="fas fa-cog fa-lg"></i>
+                    </button>
                     <button id="backButton" class="hidden bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg transition-colors">
                         <i class="fas fa-chevron-left mr-2"></i> กลับ
                     </button>
@@ -98,12 +101,7 @@
             <div class="table-container bg-white rounded-xl shadow-sm">
                 <table id="studentSummaryTable" class="w-full text-sm text-left text-gray-600">
                     <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                        <tr>
-                            <th class="px-4 py-3 text-center">ลำดับที่</th>
-                            <th class="px-6 py-3">ชื่อ - สกุล</th>
-                            <th class="px-6 py-3 text-center">คะแนนรวม</th>
-                            <th class="px-6 py-3 text-center">ผลการเรียน</th>
-                        </tr>
+                        <!-- Header is dynamically generated -->
                     </thead>
                     <tbody id="studentSummaryBody">
                         <!-- Student summary rows will be rendered here -->
@@ -129,6 +127,27 @@
     
     <!-- Tooltip Element -->
     <div id="assignmentTooltip" class="hidden bg-gray-800 text-white text-sm rounded-lg px-3 py-1.5 shadow-lg z-50"></div>
+    
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 transform -translate-y-10">
+             <div class="flex justify-between items-center mb-4">
+                 <div id="settingsModalHeader" class="flex items-center gap-4">
+                    <h3 class="text-xl font-bold">ตั้งค่าภาคเรียน</h3>
+                    <!-- Buttons will be inserted here by JS -->
+                </div>
+                <button id="settingsCloseBtn" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <div class="max-h-[60vh] overflow-y-auto space-y-4 pr-2">
+                <div id="displaySettingsContainer" class="bg-gray-100 p-4 rounded-lg">
+                    <!-- Display settings will be rendered here -->
+                </div>
+                <div id="classSettingsContainer" class="space-y-3">
+                    <!-- Class lock settings will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
 
 <script type="module" src="script.min.js"></script>
 
