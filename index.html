@@ -44,8 +44,8 @@
             background-color: #f9fafb; /* bg-gray-50 */
         }
         .table-container {
-             max-height: calc(100vh - 300px); /* Reverted to original height */
-             overflow: auto; /* Changed from overflow-y to auto to allow horizontal scrolling on small screens */
+             max-height: calc(100vh - 300px);
+             overflow: auto;
         }
         #assignmentTooltip {
             position: fixed;
@@ -57,6 +57,95 @@
         .modal-content {
             transition: transform 0.25s ease;
         }
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 100;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 30px;
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Game 24 Styles */
+        .game24-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem; /* Reduced gap */
+            margin: 1rem 0; /* Reduced margin */
+        }
+        .game24-tile, .game24-slot {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border-radius: 0.75rem;
+            background-color: #f3f4f6;
+            border: 2px solid #d1d5db;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.25rem; /* Reduced font size */
+            font-weight: 700;
+            color: #1e3a8a;
+            user-select: none;
+        }
+        .game24-tile {
+            cursor: pointer;
+            transition: transform 0.1s, border-color 0.2s, box-shadow 0.2s;
+        }
+        .game24-tile:hover {
+            border-color: #60a5fa;
+        }
+        .game24-tile.sel {
+            border-color: #3b82f6;
+            background-color: #dbeafe;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+        }
+        .game24-slot {
+            background: transparent;
+            border: 2px dashed #d1d5db;
+            opacity: 0.6;
+        }
+        .game24-ops {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+        .game24-op {
+            width: 44px; /* Reduced size */
+            height: 44px; /* Reduced size */
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 900;
+            font-size: 1.25rem; /* Reduced font size */
+            cursor: pointer;
+            border: none;
+            transition: transform 0.15s ease; /* Changed transition for scaling */
+        }
+        .game24-op:active {
+            transform: scale(0.9);
+        }
+        .game24-op.sel {
+            transform: scale(0.85); /* Scale down when selected */
+        }
+        .op-plus { background-color: #22c55e; }
+        .op-minus { background-color: #f97316; }
+        .op-times { background-color: #6366f1; }
+        .op-divide { background-color: #ef4444; }
+
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
@@ -67,7 +156,7 @@
         <header class="mb-6 bg-white p-4 rounded-xl shadow-sm">
             <div class="flex justify-between items-center">
                  <div>
-                    <h1 id="mainTitle" class="text-2xl sm:text-3xl font-bold text-gray-800">ระบบติดตามงาน</h1>
+                    <h1 id="mainTitle" class="text-2xl sm:text-3xl font-bold text-gray-800">ติดตามงานคณิตศาสตร์</h1>
                     <p id="subTitle" class="text-gray-500"></p>
                 </div>
                 <div>
@@ -128,6 +217,51 @@
     <!-- Tooltip Element -->
     <div id="assignmentTooltip" class="hidden bg-gray-800 text-white text-sm rounded-lg px-3 py-1.5 shadow-lg z-50"></div>
     
+    <!-- Toast Element for notifications -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Password Modal -->
+    <div id="passwordModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-sm p-6 transform -translate-y-10">
+            <h3 id="passwordModalTitle" class="text-xl font-bold mb-4">กรุณากรอกรหัสผ่าน</h3>
+            <input type="password" id="passwordInput" class="w-full border-gray-300 rounded-lg p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+            <p id="passwordError" class="text-red-500 text-sm mt-2 hidden">รหัสผ่านไม่ถูกต้อง</p>
+            <div class="mt-6 flex justify-end gap-3">
+                <button id="passwordCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button>
+                <button id="passwordConfirmBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">ยืนยัน</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Game 24 Modal -->
+    <div id="game24Modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-sm p-6 transform -translate-y-10 text-center">
+            <h3 id="game24ModalTitle" class="text-xl font-bold mb-2">เข้าห้องด้วยเกม 24</h3>
+            <p class="text-gray-500 mb-4">ทำให้ผลลัพธ์เป็น 24 เพื่อเข้าห้องเรียน</p>
+
+            <div class="bg-blue-600 text-white rounded-lg py-2 mb-4">
+                <div class="text-xs opacity-80">เป้าหมาย</div>
+                <div class="text-4xl font-bold">24</div>
+            </div>
+
+            <div id="game24Grid" class="game24-grid">
+                <!-- Game tiles will be rendered here -->
+            </div>
+            
+            <div id="game24Ops" class="game24-ops">
+                <button class="game24-op op-plus" data-op="+">+</button>
+                <button class="game24-op op-minus" data-op="-">−</button>
+                <button class="game24-op op-times" data-op="*">×</button>
+                <button class="game24-op op-divide" data-op="/">÷</button>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                 <button id="game24ResetBtn" class="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-2 px-4 rounded-lg"><i class="fas fa-redo"></i></button>
+                <button id="game24CancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- Settings Modal -->
     <div id="settingsModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
         <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 transform -translate-y-10">
@@ -143,7 +277,7 @@
                     <!-- Display settings will be rendered here -->
                 </div>
                 <div id="classSettingsContainer" class="space-y-3">
-                    <!-- Class lock settings will be rendered here -->
+                    <!-- Class password settings will be rendered here -->
                 </div>
             </div>
         </div>
