@@ -3,34 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบติดตามงาน</title>
+    <title>ระบบคลังและติดตามงาน (2568)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- SheetJS library for Excel export/import -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Chart.js for Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         body {
             font-family: 'Sarabun', sans-serif;
-            background-color: #f4f7f6;
         }
-        .view-container {
-            display: none;
+        .table-container {
+            max-height: 70vh; /* Limit table height to allow scrolling */
+            overflow: auto;
         }
-        .view-container.active {
-            display: block;
+        .table-cell-status {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
         }
-        .class-button {
-            transition: transform 0.2s, box-shadow 0.2s;
+        .table-cell-status:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            z-index: 10;
         }
-        .class-button:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        .square-box {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: auto;
+            margin-right: auto;
         }
-        .failing-student-row {
-            background-color: #fee2e2 !important; /* bg-red-100 */
+        .modal {
+            transition: opacity 0.25s ease;
         }
-        .failing-student-row:hover {
-            background-color: #fecaca !important; /* bg-red-200 */
+        .modal-content {
+            transition: transform 0.25s ease;
         }
         .status-A { background-color: #a7f3d0; color: #065f46; } /* Green */
         .status-B { background-color: #bfdbfe; color: #1e40af; } /* Blue */
@@ -38,296 +50,704 @@
         .status-D { background-color: #e9d5ff; color: #581c87; } /* Purple */
         .status-none { background-color: #fecaca; color: #991b1b; } /* Red */
         .status-progress { background-color: #e5e7eb; color: #1f2937; } /* Gray for numeric scores */
+        
+        .toggle-btn-active { background-color: #4f46e5; color: white; }
+        .toggle-btn-inactive { background-color: #d1d5db; color: #4b5563; }
 
-        #studentDetailTable thead th, #studentSummaryTable thead th {
-            position: sticky;
-            top: 0;
-            background-color: #f9fafb; /* bg-gray-50 */
-        }
-        .table-container {
-             max-height: calc(100vh - 300px);
-             overflow: auto;
-        }
         #assignmentTooltip {
-            position: fixed;
+            position: absolute;
+            display: none;
+            padding: 10px;
+            background-color: #333;
+            color: white;
+            border-radius: 6px;
+            z-index: 100;
             pointer-events: none;
         }
-         .modal {
-            transition: opacity 0.25s ease;
+        .status-btn-square {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        .modal-content {
-            transition: transform 0.25s ease;
+        .bulk-grade-btn {
+            width: 40px;
+            height: 40px;
+            font-size: 0.875rem;
         }
-        .toast {
-            visibility: hidden;
-            min-width: 250px;
-            background-color: #333;
-            color: #fff;
-            text-align: center;
-            border-radius: 8px;
-            padding: 16px;
+        .bulk-grade-btn.selected {
+            outline: 2px solid #2563eb;
+            outline-offset: 2px;
+        }
+        .class-tab {
+            transition: all 0.2s ease-in-out;
+            cursor: grab;
+        }
+        .class-tab.active {
+            background-color: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+        }
+        .class-tab.dragging {
+            opacity: 0.5;
+            background-color: #a5b4fc; /* indigo-300 */
+        }
+        .editable:hover {
+            background-color: #f0f9ff;
+            cursor: pointer;
+        }
+        .collapsible-content {
+            max-height: 1000px; /* Or a large enough value */
+            transition: max-height 0.5s ease-in-out, margin-top 0.5s ease-in-out, padding 0.5s ease-in-out;
+            overflow: hidden;
+        }
+        .collapsed .collapsible-content {
+            max-height: 0;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        .collapsed .collapse-icon {
+            transform: rotate(180deg);
+        }
+        .overdue-header {
+            background-color: #fee2e2; /* Light red for overdue assignments */
+        }
+        .due-soon-header {
+            background-color: #fef9c3; /* Light yellow for assignments due soon */
+        }
+        .toast-notification {
             position: fixed;
-            z-index: 100;
-            left: 50%;
-            transform: translateX(-50%);
-            bottom: 30px;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
             opacity: 0;
-            transition: opacity 0.3s, visibility 0.3s;
+            transition: opacity 0.3s ease-in-out;
         }
-        .toast.show {
-            visibility: visible;
+        .toast-notification.show {
             opacity: 1;
         }
-        
-        /* Game 24 Styles */
-        .game24-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.75rem; /* Reduced gap */
-            margin: 1rem 0; /* Reduced margin */
+
+        #managementPanel > .flex, 
+        #columnPanel > .flex, 
+        #statusPanel > .flex {
+            transition: margin-bottom 0.5s ease-in-out;
         }
-        .game24-tile, .game24-slot {
-            width: 100%;
-            aspect-ratio: 1 / 1;
-            border-radius: 0.75rem;
-            background-color: #f3f4f6;
-            border: 2px solid #d1d5db;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2.25rem; /* Reduced font size */
-            font-weight: 700;
-            color: #1e3a8a;
+
+        #managementPanel, #columnPanel, #statusPanel {
+            transition: padding-top 0.5s ease-in-out, padding-bottom 0.5s ease-in-out;
+        }
+
+        #managementPanel.collapsed,
+        #columnPanel.collapsed,
+        #statusPanel.collapsed {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+
+        #managementPanel.collapsed > .flex,
+        #columnPanel.collapsed > .flex,
+        #statusPanel.collapsed > .flex {
+            margin-bottom: 0;
+        }
+        /* Sticky header and column styles */
+        #gradebookTable thead th {
+            position: sticky;
+            top: 0;
+            z-index: 30; /* Header is above body */
+        }
+        #gradebookTable tbody td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 20; /* Sticky column is above other cells but below header */
+        }
+        #gradebookTable thead th:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 40; /* Top-left corner is on top of everything */
+        }
+        #totalScoreHeader {
             user-select: none;
         }
-        .game24-tile {
-            cursor: pointer;
-            transition: transform 0.1s, border-color 0.2s, box-shadow 0.2s;
+        #sortIndicator {
+            display: inline-block;
+            width: 1em;
+            text-align: center;
+            font-weight: bold;
         }
-        .game24-tile:hover {
-            border-color: #60a5fa;
+        .perfect-submission td:first-child {
+            background-color: #e6fffa; /* A light green/teal background */
         }
-        .game24-tile.sel {
-            border-color: #3b82f6;
-            background-color: #dbeafe;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+        .perfect-submission .student-name-cell::after {
+            content: '⭐';
+            margin-left: 8px;
+            color: #f59e0b; /* amber-500 */
         }
-        .game24-slot {
-            background: transparent;
-            border: 2px dashed #d1d5db;
-            opacity: 0.6;
+        .student-row.dragging-row {
+            opacity: 0.4;
+            background: #f0f9ff; /* light blue */
         }
-        .game24-ops {
-            display: flex;
-            justify-content: center;
-            gap: 0.75rem;
+        .student-row.drag-over {
+            border-top: 2px solid #4f46e5; /* indigo */
         }
-        .game24-op {
-            width: 44px; /* Reduced size */
-            height: 44px; /* Reduced size */
-            border-radius: 0.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #fff;
-            font-weight: 900;
-            font-size: 1.25rem; /* Reduced font size */
-            cursor: pointer;
-            border: none;
-            transition: transform 0.15s ease; /* Changed transition for scaling */
+        .zero-score {
+            color: #ef4444;
+            font-weight: 700;
         }
-        .game24-op:active {
-            transform: scale(0.9);
+        .gpa-zero-bg {
+            background-color: #fee2e2 !important; /* Light red background for GPA 0.0 */
         }
-        .game24-op.sel {
-            transform: scale(0.85); /* Scale down when selected */
+        /* Custom scrollbar for horizontal scrolling tabs on mobile */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
         }
-        .op-plus { background-color: #22c55e; }
-        .op-minus { background-color: #f97316; }
-        .op-times { background-color: #6366f1; }
-        .op-divide { background-color: #ef4444; }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+		
+		/* --- START: Fullscreen Mode Styles (Complete Replacement) --- */
 
+/* ซ่อน UI ที่ไม่ต้องการทั้งหมด */
+body.fullscreen-mode header > div:not(#topRightButtons),
+body.fullscreen-mode #classTabsContainer,
+body.fullscreen-mode #quickActionsContainer,
+body.fullscreen-mode #searchBarContainer {
+    display: none;
+}
+
+/* ย้ายตำแหน่งกล่องปุ่มไปไว้มุมขวาบนสุดของจอ และให้ลอยทับทุกอย่าง */
+body.fullscreen-mode #topRightButtons {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    z-index: 999;
+}
+
+/* ในกล่องปุ่มนั้น ให้ซ่อนปุ่มอื่นทั้งหมด ยกเว้นปุ่ม Fullscreen */
+body.fullscreen-mode #topRightButtons > button:not(#fullscreenBtn) {
+    display: none;
+}
+
+/* ขยายพื้นที่ตารางให้เต็มจอ */
+body.fullscreen-mode .w-full.p-4 {
+    padding: 0;
+}
+body.fullscreen-mode .table-container {
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* สลับไอคอนปุ่ม */
+body.fullscreen-mode .icon-enter-fullscreen {
+    display: none;
+}
+body.fullscreen-mode .icon-exit-fullscreen {
+    display: block;
+}
+/* --- END: Fullscreen Mode Styles (Complete Replacement) --- */
+
+    /* เพิ่ม CSS สำหรับปุ่มที่ Active (ย่อขนาด) */
+    .view-btn.active {
+        transform: scale(0.95);
+        box-shadow: 0 0 10px rgba(0,0,0,0.3) inset;
+    }
+
+    /* เพิ่ม CSS สำหรับปุ่มที่ถูกปิดใช้งาน (Disabled) */
+    .view-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: scale(0.95); /* ทำให้ปุ่มที่ disabled ยังคงย่ออยู่ */
+    }
+		
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
     <!-- Main Container -->
-    <div class="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+    <div class="w-full p-4 sm:p-6 lg:p-8">
         
-        <header class="mb-6 bg-white p-4 rounded-xl shadow-sm">
-            <div class="flex justify-between items-center">
-                 <div>
-                    <h1 id="mainTitle" class="text-2xl sm:text-3xl font-bold text-gray-800">ติดตามงานคณิตศาสตร์</h1>
-                    <p id="subTitle" class="text-gray-500"></p>
+        <header class="mb-4 flex flex-col sm:flex-row justify-between items-start gap-4">
+            <div>
+                <h1 id="mainTitle" class="editable text-2xl sm:text-3xl font-bold text-gray-700 rounded px-2 py-1">ระบบคลังและติดตามงาน</h1>
+                <div id="contextHeader" class="flex flex-wrap items-center gap-2 text-gray-500">
+                    <!-- Year and Semester selectors will be rendered here -->
                 </div>
-                <div>
-                    <button id="settingsButton" class="text-gray-500 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100">
-                        <i class="fas fa-cog fa-lg"></i>
-                    </button>
-                    <button id="backButton" class="hidden bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg transition-colors">
-                        <i class="fas fa-chevron-left mr-2"></i> กลับ
-                    </button>
+				<div id="dashboardScopeToggle" class="hidden mt-2 flex rounded-lg bg-gray-200 p-1 w-fit">
+    <button id="dashboardScopeSingleBtn" class="px-3 py-1 text-sm font-semibold rounded-md">เฉพาะห้องนี้</button>
+    <button id="dashboardScopeAllBtn" class="px-3 py-1 text-sm font-semibold rounded-md">รวมทุกห้อง</button>
+</div>
+            </div>
+            <div id="topRightButtons" class="flex items-center gap-2 self-end sm:self-center">
+                <!-- SYNC STATUS INDICATOR -->
+                <div id="syncStatus" class="text-sm text-gray-500 font-semibold mr-2 transition-opacity duration-300 opacity-0">
+                    All changes saved.
                 </div>
-            </div>
-             <!-- Announcement Indicator START -->
-            <div id="announcement-indicator" class="hidden mt-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-3 rounded-md" role="alert">
-                <div class="flex items-center">
-                    <div class="py-1"><i class="fas fa-info-circle fa-lg mr-3"></i></div>
-                    <div>
-                        <p class="font-bold">มีประกาศด้านล่าง</p>
-                        <p class="text-sm">กรุณาเลื่อนลงเพื่อดูรายละเอียดประกาศและรายชื่อนักเรียนที่ต้องติดตาม</p>
-                    </div>
-                </div>
-            </div>
-            <!-- Announcement Indicator END -->
-        </header>
-
-        <!-- View for Class Selection -->
-        <div id="class-selection-view" class="view-container active">
-            <div id="class-buttons-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                <!-- Class buttons will be rendered here -->
-            </div>
-            
-            <!-- Announcement Section START -->
-            <div id="announcementSection" class="my-8 p-6 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl shadow-lg text-center hidden">
-                <div class="flex items-center justify-center mb-2">
-                    <i class="fas fa-bullhorn text-3xl mr-4 animate-bounce"></i>
-                    <div>
-                        <h2 class="text-xl font-bold uppercase tracking-wider">ประกาศ</h2>
-                        <p id="announcementText" class="text-2xl font-semibold">
-                            <!-- Populated by JS -->
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <!-- Announcement Section END -->
-
-            <!-- Failing Students List START -->
-            <div id="failingStudentsListSection" class="my-8 hidden">
-                <h3 class="text-xl font-bold text-red-700 mb-4 text-center"><i class="fas fa-exclamation-triangle mr-2"></i>รายชื่อนักเรียนที่ต้องติดตามเป็นพิเศษ</h3>
-                <div id="failingStudentsListContainer" class="p-4 bg-white rounded-xl shadow-md max-h-72 overflow-y-auto">
-                    <!-- List will be populated by JS -->
-                </div>
-            </div>
-            <!-- Failing Students List END -->
-
-            <!-- Export Button START -->
-            <div id="exportButtonContainer" class="text-center mt-8 hidden">
-                <button id="exportInfographicBtn" class="bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300">
-                    <i class="fas fa-camera-retro mr-2"></i> Export เป็นรูปภาพ
+                <button id="undoBtn" class="p-2 rounded-full hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed" title="ย้อนกลับ (Undo)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12.5 8C9.81 8 7.45 8.99 5.6 10.6L2 7V16H11L7.38 12.38C8.77 11.22 10.54 10.5 12.5 10.5C16.04 10.5 19.05 12.81 20.1 16L22.47 15.22C21.07 11.03 17.15 8 12.5 8Z"/></svg>
+                </button>
+                <button id="redoBtn" class="p-2 rounded-full hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed" title="ทำซ้ำ (Redo)">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="currentColor" viewBox="0 0 24 24"><path d="M18.4 10.6C16.55 8.99 14.19 8 11.5 8C6.85 8 2.93 11.03 1.53 15.22L3.9 16C4.95 12.81 7.96 10.5 11.5 10.5C13.46 10.5 15.23 11.22 16.62 12.38L13 16H22V7L18.4 10.6Z"/></svg>
+                </button>
+                <button id="settingsBtn" class="p-2 rounded-full hover:bg-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </button>
+				<button id="fullscreenBtn" class="p-2 rounded-full hover:bg-gray-200" title="ขยายเต็มจอ (Fullscreen)">
+                    <svg class="h-6 w-6 text-gray-600 icon-enter-fullscreen" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1v4m0 0h-4m4 0l-5-5M4 16v4m0 0h4m-4 0l5-5m11 1v-4m0 0h-4m4 0l-5 5" />
+                    </svg>
+                    <svg class="h-6 w-6 text-gray-600 icon-exit-fullscreen hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 4H4v6m0-6l6 6m10 4h-6v6m0-6l6 6M10 20H4v-6m0 6l6-6m10-4h-6V4m0 6l6-6" />
+                    </svg>
                 </button>
             </div>
-            <!-- Export Button END -->
+        </header>
 
+        <!-- Responsive Layout: Stacks vertically on mobile, horizontally on larger screens -->
+        <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <!-- Horizontal Scrolling on Mobile -->
+            <div id="classTabsContainer" class="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-2 no-scrollbar">
+                <!-- Class tabs will be rendered here -->
+            </div>
+            <div id="quickActionsContainer" class="flex gap-2 w-full sm:w-auto">
+    <button id="summaryViewBtn" class="view-btn flex-1 sm:flex-none bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow transition-transform duration-200">ภาพรวม</button>
+    <button id="bubbleViewBtn" class="view-btn flex-1 sm:flex-none bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow transition-transform duration-200">Bubble View</button>
+    <button id="gradebookViewBtn" class="view-btn flex-1 sm:flex-none bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow transition-transform duration-200">ตารางคะแนน</button>
+    
+    <button id="addAssignmentBtn" class="flex-1 sm:flex-none bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow">เพิ่มงาน</button>
+    <button id="viewSummaryBtn" class="flex-1 sm:flex-none bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg shadow">ดูสรุปงาน</button>
+</div>
         </div>
 
-        <!-- View for Student Summary in a Class -->
-        <div id="student-summary-view" class="view-container">
-            <div class="mb-4">
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <i class="fas fa-search text-gray-400"></i>
+        <!-- Search Bar -->
+        <div id="searchBarContainer" class="mb-4">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <input type="text" id="searchInput" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="ค้นหา...">
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div id="mainContent">
+            <div id="gradebookView">
+                <div class="table-container bg-white rounded-lg shadow-md mb-6">
+                    <table id="gradebookTable" class="text-sm text-left text-gray-600 w-full"></table>
+                </div>
+            </div>
+            <div id="dashboardView" class="hidden">
+                 <div id="dashboardContent" class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-4">
+                        <h2 id="dashboardTitle" class="text-2xl font-bold text-gray-800">สรุปผลภาพรวมวิชาคณิตศาสตร์</h2>
+                        <div class="flex items-center gap-2 mt-4 sm:mt-0">
+                            <!-- NEW: Filter Button -->
+                            <button id="toggleFilterPanelBtn" class="bg-gray-200 text-gray-700 font-bold py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center shadow">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                                ตัวกรองขั้นสูง
+                            </button>
+                            <button id="exportDashboardBtn" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center shadow-md">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Export JPG
+                            </button>
+                        </div>
                     </div>
-                    <input type="text" id="studentSearchInput" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="ค้นหาชื่อนักเรียน...">
+                    <!-- NEW: Filter Panel -->
+                    <div id="filterPanel" class="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200 hidden">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                            <!-- Filter: At Risk -->
+                            <div>
+                                <label for="filterAtRisk" class="font-semibold block mb-1">นักเรียนที่ต้องดูแล (ค้างงาน > <span id="atRiskPercentLabel">50</span>%)</label>
+                                <input type="range" id="filterAtRisk" min="0" max="100" value="50" class="w-full">
+                            </div>
+                            <!-- Filter: Late Submissions -->
+                            <div>
+                                <label for="filterLate" class="font-semibold block mb-1">ส่งงานช้ามากกว่า (ชิ้น)</label>
+                                <input type="number" id="filterLate" min="0" value="" class="w-full p-1 border rounded">
+                            </div>
+                            <!-- Filter: Missing Specific Assignment -->
+                            <div>
+                                <label for="filterMissingAssignment" class="font-semibold block mb-1">ยังไม่ส่งงานชิ้น</label>
+                                <select id="filterMissingAssignment" class="w-full p-1 border rounded bg-white">
+                                    <option value="all">-- ทุกชิ้น --</option>
+                                </select>
+                            </div>
+                            <!-- Filter: GPA -->
+                            <div class="lg:col-span-1">
+                                <label class="font-semibold block mb-1">ผลการเรียน (GPA)</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="filterGpaMin" min="0" max="4" step="0.5" placeholder="ต่ำสุด" class="w-1/2 p-1 border rounded">
+                                    <span>-</span>
+                                    <input type="number" id="filterGpaMax" min="0" max="4" step="0.5" placeholder="สูงสุด" class="w-1/2 p-1 border rounded">
+                                </div>
+                            </div>
+                            <!-- Filter: Total Score -->
+                            <div class="lg:col-span-1">
+                                <label class="font-semibold block mb-1">คะแนนรวม</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="filterScoreMin" min="0" max="100" placeholder="ต่ำสุด" class="w-1/2 p-1 border rounded">
+                                    <span>-</span>
+                                    <input type="number" id="filterScoreMax" min="0" max="100" placeholder="สูงสุด" class="w-1/2 p-1 border rounded">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex justify-end gap-2">
+                            <button id="resetFiltersBtn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow">ล้างตัวกรอง</button>
+                            <button id="applyFiltersBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow">ใช้ตัวกรอง</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- Chart 1: Submission Overview -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="font-semibold mb-2 text-center">ภาพรวมการส่งงาน</h3>
+                            <div class="w-full max-w-xs mx-auto">
+                                <canvas id="submissionChart"></canvas>
+                            </div>
+                        </div>
+                        <!-- Chart 2: Assignment Performance -->
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="font-semibold mb-2 text-center">อัตราการส่งแต่ละงาน</h3>
+                            <canvas id="performanceChart"></canvas>
+                        </div>
+                        <!-- Students at Risk -->
+                        <div class="bg-red-50 p-4 rounded-lg">
+                            <h3 id="atRiskTitle" class="font-semibold text-red-800 mb-2">🔴 นักเรียนที่ต้องดูแลเป็นพิเศษ</h3>
+                            <ul id="studentsAtRiskList" class="list-disc list-inside text-red-700"></ul>
+                        </div>
+                        <!-- Top Performers -->
+                        <div class="bg-green-50 p-4 rounded-lg">
+                             <h3 id="topPerformersTitle" class="font-semibold text-green-800 mb-2">⭐ นักเรียนดีเด่น</h3>
+                            <ul id="topPerformersList" class="list-disc list-inside text-green-700"></ul>
+                        </div>
+                    </div>
+                </div>
+				
+				<div id="bubbleDashboardContent" class="hidden bg-white p-6 rounded-lg shadow-md">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
+        <h2 id="bubbleDashboardTitle" class="text-2xl font-bold text-gray-800">ภาพรวมนักเรียน (Bubble View)</h2>
+        
+        <div id="bubbleScopeToggle" class="flex rounded-lg bg-gray-200 p-1 mt-2 sm:mt-0">
+            <button id="bubbleScopeSingleBtn" class="px-3 py-1 text-sm font-semibold rounded-md">เฉพาะห้องนี้</button>
+            <button id="bubbleScopeAllBtn" class="px-3 py-1 text-sm font-semibold rounded-md">รวมทุกห้อง</button>
+        </div>
+        </div>
+    <div style="height: 65vh;">
+        <canvas id="studentBubbleChart"></canvas>
+    </div>
+</div>
+				
+            </div>
+            <div id="studentReportView" class="hidden">
+                <!-- This div will be populated by renderStudentReport -->
+            </div>
+            <div id="warehouseView" class="hidden">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold text-gray-800">คลังนักเรียนติด 0</h2>
+                        <div id="warehouseToggle" class="flex rounded-lg bg-gray-200 p-1">
+                            <button id="toggleFailed" class="px-3 py-1 text-sm font-semibold rounded-md">ยังไม่แก้</button>
+                            <button id="toggleResolved" class="px-3 py-1 text-sm font-semibold rounded-md">แก้แล้ว</button>
+                        </div>
+                    </div>
+                    <div id="warehouseTableContainer">
+                        <!-- Warehouse tables will be rendered here -->
+                    </div>
                 </div>
             </div>
-            <div class="table-container bg-white rounded-xl shadow-sm">
-                <table id="studentSummaryTable" class="w-full text-sm text-left text-gray-600">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                        <!-- Header is dynamically generated -->
-                    </thead>
-                    <tbody id="studentSummaryBody">
-                        <!-- Student summary rows will be rendered here -->
-                    </tbody>
-                </table>
-            </div>
         </div>
-
-        <!-- View for a single Student's Details -->
-        <div id="student-detail-view" class="view-container">
-             <div class="table-container bg-white rounded-xl shadow-sm">
-                <table id="studentDetailTable" class="w-full text-sm text-left text-gray-600">
-                     <thead class="text-xs text-gray-700 uppercase bg-gray-50">
-                        <!-- Header is dynamically controlled in JS now -->
-                    </thead>
-                    <tbody id="studentDetailBody">
-                        <!-- Student's assignment details will be rendered here -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    
     </div>
-    
-    <!-- Tooltip Element -->
-    <div id="assignmentTooltip" class="hidden bg-gray-800 text-white text-sm rounded-lg px-3 py-1.5 shadow-lg z-50"></div>
-    
-    <!-- Toast Element for notifications -->
-    <div class="toast" id="toast"></div>
 
-    <!-- Password Modal -->
-    <div id="passwordModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
-        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-sm p-6 transform -translate-y-10">
-            <h3 id="passwordModalTitle" class="text-xl font-bold mb-4">กรุณากรอกรหัสผ่าน</h3>
-            <input type="password" id="passwordInput" class="w-full border-gray-300 rounded-lg p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
-            <p id="passwordError" class="text-red-500 text-sm mt-2 hidden">รหัสผ่านไม่ถูกต้อง</p>
-            <div class="mt-6 flex justify-end gap-3">
-                <button id="passwordCancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button>
-                <button id="passwordConfirmBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">ยืนยัน</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Game 24 Modal -->
-    <div id="game24Modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
-        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-sm p-6 transform -translate-y-10 text-center">
-            <h3 id="game24ModalTitle" class="text-xl font-bold mb-2">เข้าห้องด้วยเกม 24</h3>
-            <p class="text-gray-500 mb-4">ทำให้ผลลัพธ์เป็น 24 เพื่อเข้าห้องเรียน</p>
-
-            <div class="bg-blue-600 text-white rounded-lg py-2 mb-4">
-                <div class="text-xs opacity-80">เป้าหมาย</div>
-                <div class="text-4xl font-bold">24</div>
-            </div>
-
-            <div id="game24Grid" class="game24-grid">
-                <!-- Game tiles will be rendered here -->
-            </div>
-            
-            <div id="game24Ops" class="game24-ops">
-                <button class="game24-op op-plus" data-op="+">+</button>
-                <button class="game24-op op-minus" data-op="-">−</button>
-                <button class="game24-op op-times" data-op="*">×</button>
-                <button class="game24-op op-divide" data-op="/">÷</button>
-            </div>
-
-            <div class="mt-6 flex justify-end gap-3">
-                 <button id="game24ResetBtn" class="bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-bold py-2 px-4 rounded-lg"><i class="fas fa-redo"></i></button>
-                <button id="game24CancelBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Settings Modal -->
+    <!-- Modals -->
     <div id="settingsModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
-        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 transform -translate-y-10">
-             <div class="flex justify-between items-center mb-4">
-                 <div id="settingsModalHeader" class="flex items-center gap-4">
-                    <h3 class="text-xl font-bold">ตั้งค่าภาคเรียน</h3>
-                    <!-- Buttons will be inserted here by JS -->
-                </div>
-                <button id="settingsCloseBtn" class="text-gray-400 hover:text-gray-600">&times;</button>
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-4xl p-6 transform -translate-y-10">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold">ตั้งค่า</h3>
+                <button id="closeSettingsModalBtn" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
             </div>
-            <div class="max-h-[60vh] overflow-y-auto space-y-4 pr-2">
-                <div id="displaySettingsContainer" class="bg-gray-100 p-4 rounded-lg">
-                    <!-- Display settings will be rendered here -->
-                </div>
-                <div id="classSettingsContainer" class="space-y-3">
-                    <!-- Class password settings will be rendered here -->
+            <div class="max-h-[70vh] overflow-y-auto pr-4">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div id="managementPanel" class="bg-gray-50 p-3 rounded-lg shadow-inner">
+                        <div class="flex justify-between items-center mb-2">
+                            <h2 class="text-md font-semibold">เครื่องมือจัดการ (ภาคเรียนปัจจุบัน):</h2>
+                            <button class="collapse-btn p-1 rounded-full hover:bg-gray-200">
+                                <svg class="collapse-icon w-5 h-5 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                        </div>
+                        <div class="collapsible-content pt-2">
+                            <div class="flex flex-wrap gap-3 items-center">
+                                <button id="addStudentBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow">เพิ่มนักเรียน</button>
+                                <button id="addSpecialColumnBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg shadow">เพิ่มคอลัมน์พิเศษ</button>
+                            </div>
+                            <div class="mt-4 border-t pt-3">
+                                <h3 class="text-sm font-semibold mb-2">จัดการห้องเรียน:</h3>
+                                <div class="flex flex-wrap gap-3 items-center">
+                                    <button id="deleteClassBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow disabled:opacity-50 disabled:cursor-not-allowed">ลบห้องเรียนปัจจุบัน</button>
+                                </div>
+                            </div>
+                            <div class="mt-4 border-t pt-3">
+                                <h3 class="text-sm font-semibold mb-2">ตั้งค่าห้องเรียนปัจจุบัน:</h3>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="linkSemestersCheckbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    <label for="linkSemestersCheckbox" class="ml-2 text-sm text-gray-900">เชื่อมโยงภาคเรียน 1 และ 2 (สำหรับห้องนี้)</label>
+                                </div>
+                            </div>
+                             <div class="mt-4 border-t pt-3">
+                                <h3 class="text-sm font-semibold mb-2">นำเข้า/ส่งออก:</h3>
+								<button id="advancedExportBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow">ส่งออก ปพ.5 (Excel)</button>
+                                <div class="flex flex-wrap gap-3 items-center">
+                                    <button id="exportBtn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg shadow">Export (สำรองข้อมูล)</button>
+                                    <button id="importBtn" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg shadow">Import (กู้ข้อมูล)</button>
+                                    <input type="file" id="importFile" class="hidden" accept=".xlsx, .xls">
+                                    <button id="customImportBtn" class="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg shadow">Import (ข้อมูลดิบ)</button>
+                                    <input type="file" id="customImportFile" class="hidden" accept=".xlsx, .xls">
+                                </div>
+                            </div>
+                             <div class="mt-4 border-t pt-3">
+                                <h3 class="text-sm font-semibold mb-2">ตั้งค่าคะแนนเต็ม (สำหรับห้องนี้):</h3>
+                                <div class="flex items-center gap-4">
+                                    <label for="assignmentScoreInput" class="font-medium">คะแนนเก็บ:</label>
+                                    <input type="number" id="assignmentScoreInput" class="w-20 border border-gray-300 rounded-lg p-1 text-center">
+                                </div>
+                            </div>
+                            <div class="mt-4 border-t pt-3">
+                                 <button id="clearDataBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow w-full">ล้างข้อมูลทั้งหมดในห้องนี้</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="columnPanel" class="bg-gray-50 p-3 rounded-lg shadow-inner">
+                         <div class="flex justify-between items-center mb-2">
+                            <h2 class="text-md font-semibold">จัดการคอลัมน์:</h2>
+                            <button class="collapse-btn p-1 rounded-full hover:bg-gray-200">
+                                 <svg class="collapse-icon w-5 h-5 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                        </div>
+                        <div id="columnToggleContainer" class="collapsible-content pt-2 flex flex-wrap gap-2 items-center">
+                            <button data-column="assignmentScore" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">คะแนนเก็บ</button>
+                            <button data-column="midterm" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">กลางภาค</button>
+                            <button data-column="final" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">ปลายภาค</button>
+                            <button data-column="midYear" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">กลางปี</button>
+                            <button data-column="yearEnd" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">ปลายปี</button>
+                            <!-- MODIFIED: Added new column buttons -->
+                            <button data-column="notebook" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">สมุด</button>
+                            <button data-column="textbook" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">หนังสือเรียน</button>
+                            <button data-column="workbook" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">หนังสือแบบฝึกหัด</button>
+                            <button data-column="special" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">พิเศษ</button>
+                            <!-- END MODIFICATION -->
+                            <button data-column="totalScore" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">รวม</button>
+                            <button data-column="gpa" class="toggle-column-btn text-sm font-bold py-2 px-3 rounded-lg shadow">ผลการเรียน</button>
+                        </div>
+                        <div class="mt-4 border-t pt-3">
+                            <h3 class="text-sm font-semibold mb-2">การจัดเรียงงาน (แนวนอน):</h3>
+                            <div class="flex flex-wrap gap-2">
+                                <button id="sortAssignmentsDefault" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-1 px-2 rounded">ตามลำดับเดิม</button>
+                                <button id="sortAssignmentsAsc" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-1 px-2 rounded">ส่งน้อย > มาก</button>
+                                <button id="sortAssignmentsDesc" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-1 px-2 rounded">ส่งมาก > น้อย</button>
+                            </div>
+                        </div>
+                    </div>
+                     <div id="statusPanel" class="bg-gray-50 p-3 rounded-lg shadow-inner lg:col-span-2">
+                         <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-semibold text-md">คำอธิบายสถานะการส่งงาน:</h3>
+                            <button class="collapse-btn p-1 rounded-full hover:bg-gray-200">
+                                 <svg class="collapse-icon w-5 h-5 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+                        </div>
+                        <div class="collapsible-content pt-2 flex flex-wrap gap-4 text-sm">
+                            <span class="font-semibold status-A px-2 py-1 rounded-md">A: ส่งตรงเวลาและถูกต้อง</span>
+                            <span class="font-semibold status-B px-2 py-1 rounded-md">B: ส่งตรงเวลาแต่ไม่ถูกต้อง</span>
+                            <span class="font-semibold status-C px-2 py-1 rounded-md">C: ส่งช้าแต่ถูกต้อง</span>
+                            <span class="font-semibold status-D px-2 py-1 rounded-md">D: ส่งช้าและไม่ถูกต้อง</span>
+                            <span class="font-semibold status-none px-2 py-1 rounded-md">ยังไม่ส่ง</span>
+                        </div>
+                    </div>
+                    <div id="yearManagementPanel" class="bg-blue-50 p-3 rounded-lg shadow-inner lg:col-span-2">
+                        <h2 class="text-md font-semibold mb-2">จัดการปีการศึกษา:</h2>
+                        <div class="flex flex-wrap gap-3 items-center">
+                            <button id="addYearBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow">เพิ่มปีการศึกษา</button>
+                            <button id="addSemesterBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow">เพิ่มภาคเรียน</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+    <div id="assignmentTooltip"></div>
+    <div id="gradeModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-sm p-6 transform -translate-y-10">
+            <h3 class="text-xl font-bold mb-2">แก้ไขสถานะการส่งงาน</h3>
+            <p>นักเรียน: <span id="modalStudentName" class="font-semibold"></span></p>
+            <p class="mb-4">งาน: <span id="modalAssignmentName" class="font-semibold"></span></p>
+            <div class="flex flex-wrap justify-center gap-2">
+                <button data-status="A" class="status-btn status-btn-square status-A text-lg font-bold rounded-lg shadow">A</button>
+                <button data-status="B" class="status-btn status-btn-square status-B text-lg font-bold rounded-lg shadow">B</button>
+                <button data-status="C" class="status-btn status-btn-square status-C text-lg font-bold rounded-lg shadow">C</button>
+                <button data-status="D" class="status-btn status-btn-square status-D text-lg font-bold rounded-lg shadow">D</button>
+                <button data-status="none" class="status-btn status-btn-square status-none text-xs font-bold rounded-lg shadow">ยังไม่ส่ง</button>
+            </div>
+            <div class="mt-4 border-t pt-4">
+                <label for="modalProgressScore" class="block text-sm font-medium text-gray-700">คะแนนความก้าวหน้า (ไม่คิดเกรด)</label>
+                <input type="number" id="modalProgressScore" class="mt-1 w-full text-center border-gray-300 rounded-lg p-2 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+            <div class="mt-6 text-right"><button id="closeGradeModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ปิด</button></div>
+        </div>
+    </div>
+    <div id="inputModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md p-6 transform -translate-y-10">
+            <h3 id="inputModalTitle" class="text-xl font-bold mb-2"></h3>
+            <p id="inputModalDesc" class="mb-4 text-gray-600"></p>
+            <input type="text" id="inputModalField" class="w-full border border-gray-300 rounded-lg p-2 mb-4">
+			
+			<div id="avatarInputContainer" class="mb-4 hidden">
+                <label class="block text-gray-700 text-sm font-bold mb-2">ลิงก์รูปโปรไฟล์ (URL)</label>
+                <input type="text" id="studentAvatar" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="ใส่ลิงก์รูป (Google Drive, Imgur ฯลฯ)">
+            </div>
+			
+            <textarea id="inputModalTextarea" class="w-full border border-gray-300 rounded-lg p-2 mb-4" rows="5"></textarea>
+            <div class="flex justify-end gap-3">
+                <button id="inputModalCancelBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button>
+                <button id="inputModalConfirmBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">ยืนยัน</button>
+            </div>
+        </div>
+    </div>
+    <div id="assignmentModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-lg p-6 transform -translate-y-10">
+            <h3 id="assignmentModalTitle" class="text-xl font-bold mb-4"></h3>
+            <form id="assignmentForm" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2"><label for="assignmentName" class="block mb-1 font-semibold">ชื่องาน</label><input type="text" id="assignmentName" class="w-full border rounded-lg p-2" required></div>
+                <div><label for="assignmentChapter" class="block mb-1 font-semibold">บทที่</label><input type="text" id="assignmentChapter" class="w-full border rounded-lg p-2"></div>
+                <div><label for="assignmentDate" class="block mb-1 font-semibold">วันที่มอบหมาย</label><input type="text" id="assignmentDate" class="w-full border rounded-lg p-2" placeholder="วว/ดด/ปปปป"></div>
+                <div><label for="daysToSubmit" class="block mb-1 font-semibold">กำหนดส่ง (วัน)</label><input type="number" id="daysToSubmit" class="w-full border rounded-lg p-2" value="7"></div>
+                <div><label for="assignmentQuantity" class="block mb-1 font-semibold">จำนวน</label><input type="number" id="assignmentQuantity" class="w-full border rounded-lg p-2"></div>
+                <div><label for="assignmentPage" class="block mb-1 font-semibold">หน้า</label><input type="text" id="assignmentPage" class="w-full border rounded-lg p-2"></div>
+                <div><label for="assignmentWeight" class="block mb-1 font-semibold">น้ำหนักคะแนน</label><input type="number" id="assignmentWeight" class="w-full border rounded-lg p-2" value="1" min="0" step="0.1"></div>
+            </form>
+            <div class="flex justify-end gap-3 mt-6">
+                <button id="assignmentModalCancelBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button>
+                <button id="assignmentModalConfirmBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">บันทึก</button>
+            </div>
+        </div>
+    </div>
+    <div id="summaryModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-5xl p-6 transform -translate-y-10">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">สรุปรายการงานทั้งหมด</h3>
+                <button id="closeSummaryModalBtn" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+            </div>
+            <div class="max-h-[70vh] overflow-y-auto">
+                <table class="w-full text-sm text-left text-gray-600">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-4 py-2">ที่</th><th class="px-4 py-2">บทที่</th><th class="px-4 py-2 w-1/2">ชื่องาน</th>
+                            <th class="px-4 py-2 text-center">น้ำหนัก</th><th class="px-4 py-2 text-center">จำนวน</th><th class="px-4 py-2 text-center">หน้า</th><th class="px-4 py-2">วันที่มอบหมาย</th><th class="px-4 py-2">กำหนดส่ง</th><th class="px-4 py-2 text-center">สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div id="bulkGradeModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 transform -translate-y-10">
+            <div class="flex justify-between items-start mb-4">
+                <h3 id="bulkGradeModalTitle" class="text-xl font-bold">ให้คะแนนงาน</h3>
+                <div class="flex items-center">
+                    <input type="checkbox" id="bulkGradeFilter" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                    <label for="bulkGradeFilter" class="ml-2 block text-sm text-gray-900">แสดงเฉพาะที่ยังไม่ส่ง</label>
+                </div>
+            </div>
+            <div id="bulkGradeTableBody" class="max-h-[70vh] overflow-y-auto">
+                <!-- Content will be rendered here -->
+            </div>
+            <div class="mt-6 text-right"><button id="closeBulkGradeModalBtn" class="bg-gray-300 hover:bg-gray-400 font-bold py-2 px-4 rounded-lg">ปิด</button></div>
+        </div>
+    </div>
+    <div id="studentGradeModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 transform -translate-y-10">
+             <div class="flex justify-between items-start mb-4">
+                <h3 id="studentGradeModalTitle" class="text-xl font-bold">ให้คะแนนนักเรียน</h3>
+                <div class="flex items-center">
+                    <input type="checkbox" id="studentGradeFilter" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                    <label for="studentGradeFilter" class="ml-2 block text-sm text-gray-900">แสดงเฉพาะที่ยังไม่ส่ง</label>
+                </div>
+            </div>
+            <div id="studentGradeTableBody" class="max-h-[70vh] overflow-y-auto">
+                <!-- Content will be rendered here -->
+            </div>
+            <div class="mt-6 flex justify-between items-center">
+                <button id="viewStudentReportBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg shadow">รายงานผลนักเรียนรายบุคคล</button>
+                <button id="closeStudentGradeModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ปิด</button>
+            </div>
+        </div>
+    </div>
+    <div id="failedStudentDetailModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-4xl p-6 transform -translate-y-10">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">รายละเอียดผลการเรียน</h3>
+                <button id="closeFailedStudentDetailModalBtn" class="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+            </div>
+            <div id="failedStudentDetailContent" class="max-h-[70vh] overflow-y-auto">
+                <!-- Content will be rendered here -->
+            </div>
+        </div>
+    </div>
 
-<script type="module" src="script.min.js"></script>
+<!-- Modal ส่งออก ปพ.5 -->
+<div id="advancedExportModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+    <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md p-6 transform -translate-y-10">
+        <h3 class="text-xl font-bold mb-4">ส่งออกคะแนน ปพ.5 (Excel)</h3>
+        <div class="mb-4">
+            <label class="block font-semibold mb-2 text-gray-700">เลือกระดับชั้น:</label>
+            <div class="flex gap-4">
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="radio" name="exportLevel" value="primary" class="form-radio text-indigo-600 h-4 w-4" checked>
+                    <span class="ml-2 text-gray-800">ประถมศึกษา (เก็บ 70 / สอบ 30)</span>
+                </label>
+                <label class="inline-flex items-center cursor-pointer">
+                    <input type="radio" name="exportLevel" value="secondary" class="form-radio text-indigo-600 h-4 w-4">
+                    <span class="ml-2 text-gray-800">มัธยมศึกษา (เก็บ 50 / กลาง 20 / ปลาย 30)</span>
+                </label>
+            </div>
+        </div>
 
+        <div id="secondaryOptions" class="hidden bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-3 mb-4">
+            <div>
+                <label class="block font-semibold mb-1 text-sm text-gray-700">ภาคเรียน:</label>
+                <select id="exportTerm" class="w-full border border-gray-300 rounded-md p-2 focus:ring-indigo-500">
+                    <option value="term1">ภาคเรียนที่ 1</option>
+                    <option value="term2">ภาคเรียนที่ 2</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-semibold mb-1 text-sm text-gray-700">รายวิชา:</label>
+                <select id="exportSubject" class="w-full border border-gray-300 rounded-md p-2 focus:ring-indigo-500"></select>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+            <button id="cancelAdvancedExportBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">ยกเลิก</button>
+            <button id="confirmAdvancedExportBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow">ดาวน์โหลด Excel</button>
+        </div>
+    </div>
+</div>
+
+
+
+
+    <script type="module" src="script.min.js"></script>
 </body>
 </html>
