@@ -592,12 +592,14 @@ body.fullscreen-mode .icon-exit-fullscreen {
             <h3 class="text-xl font-bold mb-2">แก้ไขสถานะการส่งงาน</h3>
             <p>นักเรียน: <span id="modalStudentName" class="font-semibold"></span></p>
             <p class="mb-4">งาน: <span id="modalAssignmentName" class="font-semibold"></span></p>
-            <div class="flex flex-wrap justify-center gap-2">
-                <button data-status="A" class="status-btn status-btn-square status-A text-lg font-bold rounded-lg shadow">A</button>
-                <button data-status="B" class="status-btn status-btn-square status-B text-lg font-bold rounded-lg shadow">B</button>
-                <button data-status="C" class="status-btn status-btn-square status-C text-lg font-bold rounded-lg shadow">C</button>
-                <button data-status="D" class="status-btn status-btn-square status-D text-lg font-bold rounded-lg shadow">D</button>
-                <button data-status="none" class="status-btn status-btn-square status-none text-xs font-bold rounded-lg shadow">ยังไม่ส่ง</button>
+            <div id="gradeButtonsContainer" class="flex flex-wrap justify-center gap-2">
+                </div>
+            <div id="autoGraderContainer" class="mt-4 border-t pt-4 hidden bg-indigo-50 p-3 rounded-lg">
+                <label class="block text-sm font-bold text-indigo-800 mb-2">🤖 แปลงเกรดอัตโนมัติ (เต็ม <span id="autoGraderMax"></span> ข้อ)</label>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="autoGraderInput" class="w-full text-center border border-indigo-300 rounded-lg p-2 focus:ring-indigo-500" placeholder="ทำถูกกี่ข้อ?">
+                    <button id="autoGraderBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-lg shadow">แปลงเป็นเกรด</button>
+                </div>
             </div>
             <div class="mt-4 border-t pt-4">
                 <label for="modalProgressScore" class="block text-sm font-medium text-gray-700">คะแนนความก้าวหน้า (ไม่คิดเกรด)</label>
@@ -705,6 +707,18 @@ body.fullscreen-mode .icon-exit-fullscreen {
             </div>
         </div>
     </div>
+	
+	<div id="unlockModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md p-6 transform -translate-y-10">
+            <h3 class="text-xl font-bold mb-4">🔓 ปลดล็อกคะแนนงาน: <span id="unlockAssignmentName" class="text-indigo-600"></span></h3>
+            <p class="text-sm text-gray-600 mb-4">เลือกนักเรียนที่ต้องการรีเซ็ตคะแนนและสิทธิ์การส่งซ่อม (สถานะจะกลับไปเป็น "ยังไม่ส่ง")</p>
+            <div id="unlockStudentList" class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-2">
+                </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button id="closeUnlockModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">ปิด</button>
+            </div>
+        </div>
+    </div>
 
 <!-- Modal ส่งออก ปพ.5 -->
 <div id="advancedExportModal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden opacity-0 z-50">
@@ -751,3 +765,5 @@ body.fullscreen-mode .icon-exit-fullscreen {
     <script type="module" src="script.min.js"></script>
 </body>
 </html>
+
+
